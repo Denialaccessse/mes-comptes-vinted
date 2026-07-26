@@ -226,6 +226,24 @@
   .map-grid .k{ font-size:13px; font-weight:600; }
   .map-grid select{ padding:7px 9px; border:1px solid var(--line); border-radius:6px; font-size:13px; }
 
+  .sync-status{ display:flex; align-items:center; gap:9px; font-size:13.5px; margin-bottom:6px; }
+  .dot{ width:9px; height:9px; border-radius:50%; background:var(--ink-soft); flex-shrink:0; }
+  .dot.on{ background:var(--teal); }
+  .dot.off{ background:var(--rust); }
+  .id-box{
+    display:flex; align-items:center; gap:8px; font-family:var(--font-mono); font-size:13px;
+    background:var(--paper); border:1px solid var(--line); border-radius:7px; padding:9px 12px; margin:10px 0 16px;
+    word-break:break-all;
+  }
+  .id-box span{ flex:1; }
+  details.help{ margin-top:6px; }
+  details.help summary{ cursor:pointer; font-size:13px; color:var(--teal); font-weight:600; }
+  details.help ol{ font-size:13px; color:var(--ink-soft); line-height:1.7; padding-left:20px; margin-top:10px;}
+  details.help code{ background:var(--paper); padding:1px 5px; border-radius:4px; font-family:var(--font-mono); font-size:12px;}
+  .field-row{ display:flex; gap:8px; align-items:flex-end; }
+  .field-row .field{ flex:1; margin-bottom:0; }
+  .btn-row{ display:flex; gap:10px; flex-wrap:wrap; margin-top:16px; }
+
   .toast{
     position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(20px);
     background:var(--ink); color:#fff; padding:11px 20px; border-radius:8px; font-size:13.5px;
@@ -258,6 +276,7 @@
       <button class="nav-btn active" data-view="dashboard"><span class="ico">◆</span>Tableau de bord</button>
       <button class="nav-btn" data-view="transactions"><span class="ico">≡</span>Transactions</button>
       <button class="nav-btn" data-view="import"><span class="ico">⇅</span>Importer / Exporter</button>
+      <button class="nav-btn" data-view="sync"><span class="ico">⟲</span>Synchronisation</button>
     </nav>
     <div class="sidebar-foot">Toutes les données restent sur cet ordinateur, dans ce fichier de navigateur (rien n'est envoyé sur internet).</div>
   </aside>
@@ -357,6 +376,58 @@
         </p>
       </div>
     </section>
+
+    <!-- SYNC -->
+    <section class="view" id="view-sync">
+      <h1>Synchronisation</h1>
+      <p class="lede">Retrouve les mêmes données sur ton Mac et sur ton téléphone, via une sauvegarde privée sur ton compte GitHub.</p>
+
+      <div class="panel">
+        <div class="sync-status"><span class="dot" id="sync-dot"></span><span id="sync-status-text">Non connecté sur cet appareil</span></div>
+        <p style="font-size:12.5px; color:var(--ink-soft); margin:0 0 16px;">À faire une fois par appareil. Les données se renvoient ensuite automatiquement à chaque modification.</p>
+
+        <div id="sync-setup">
+          <div class="field">
+            <label>Token GitHub (avec la permission « gist »)</label>
+            <input type="password" id="f-sync-token" placeholder="ghp_...">
+          </div>
+          <div class="field">
+            <label>ID de synchro</label>
+            <input type="text" id="f-sync-gistid" placeholder="Laisse vide sur le 1er appareil pour en créer une nouvelle">
+          </div>
+          <div class="btn-row">
+            <button class="btn teal" id="btn-sync-connect">Connecter cet appareil</button>
+          </div>
+          <details class="help">
+            <summary>Comment créer ce token ?</summary>
+            <ol>
+              <li>Va sur <code>github.com/settings/tokens</code></li>
+              <li><strong>Generate new token → Generate new token (classic)</strong></li>
+              <li>Donne-lui un nom, coche uniquement la case <code>gist</code></li>
+              <li><strong>Generate token</strong>, puis copie-le (il ne s'affichera qu'une fois)</li>
+              <li>Colle-le ci-dessus, laisse « ID de synchro » vide, clique « Connecter cet appareil »</li>
+            </ol>
+          </details>
+        </div>
+
+        <div id="sync-connected" style="display:none;">
+          <div class="field"><label>ID de synchro à recopier sur ton autre appareil</label></div>
+          <div class="id-box"><span id="sync-gistid-display"></span><button class="btn ghost small" id="btn-copy-gistid">Copier</button></div>
+          <p style="font-size:12.5px; color:var(--ink-soft);" id="sync-last">—</p>
+          <div class="btn-row">
+            <button class="btn teal" id="btn-sync-now">Synchroniser maintenant</button>
+            <button class="btn ghost" id="btn-sync-disconnect">Déconnecter cet appareil</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Sur ton autre appareil</h2>
+        <p style="font-size:13px; color:var(--ink-soft); line-height:1.6;">
+          Ouvre l'appli, va dans <strong>Synchronisation</strong>, colle le <strong>même token</strong> (ou un nouveau token « gist » de ton compte) et l'<strong>ID de synchro</strong> affiché ci-dessus, puis clique « Connecter cet appareil ». Ses données actuelles seront remplacées par celles de la synchro.
+        </p>
+      </div>
+    </section>
   </main>
 </div>
 
@@ -424,6 +495,7 @@
   function save(){
     try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
     catch(e){ toast("Impossible d'enregistrer (stockage plein ?)"); }
+    scheduleSync();
   }
 
   function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
@@ -464,6 +536,7 @@
       document.getElementById('view-'+btn.dataset.view).classList.add('active');
       if(btn.dataset.view === 'dashboard') renderDashboard();
       if(btn.dataset.view === 'transactions') renderTable();
+      if(btn.dataset.view === 'sync') renderSyncUI();
     });
   });
 
@@ -851,9 +924,165 @@
     return s;
   }
 
+  /* ---------- Sync (GitHub Gist) ---------- */
+  const SYNC_KEY = "vinted-sync-config-v1";
+  const GIST_FILENAME = "comptes-vinted-data.json";
+  const API = "https://api.github.com";
+  let syncTimer = null;
+
+  function getSyncConfig(){
+    try{ return JSON.parse(localStorage.getItem(SYNC_KEY)) || null; }
+    catch(e){ return null; }
+  }
+  function setSyncConfig(cfg){
+    localStorage.setItem(SYNC_KEY, JSON.stringify(cfg));
+  }
+  function clearSyncConfig(){
+    localStorage.removeItem(SYNC_KEY);
+  }
+  function ghHeaders(token){
+    return {
+      'Authorization': 'Bearer ' + token,
+      'Accept': 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+      'Content-Type': 'application/json'
+    };
+  }
+
+  async function createGist(token){
+    const res = await fetch(API + '/gists', {
+      method:'POST', headers: ghHeaders(token),
+      body: JSON.stringify({
+        description: 'Sauvegarde — Mes Comptes Vinted',
+        public: false,
+        files: { [GIST_FILENAME]: { content: JSON.stringify(state) } }
+      })
+    });
+    if(!res.ok) throw new Error('create:' + res.status);
+    const data = await res.json();
+    return data.id;
+  }
+
+  async function pushToGist(cfg){
+    const res = await fetch(API + '/gists/' + cfg.gistId, {
+      method:'PATCH', headers: ghHeaders(cfg.token),
+      body: JSON.stringify({ files: { [GIST_FILENAME]: { content: JSON.stringify(state) } } })
+    });
+    if(!res.ok) throw new Error('push:' + res.status);
+  }
+
+  async function pullFromGist(cfg){
+    const res = await fetch(API + '/gists/' + cfg.gistId, { headers: ghHeaders(cfg.token) });
+    if(!res.ok) throw new Error('pull:' + res.status);
+    const data = await res.json();
+    const file = data.files && data.files[GIST_FILENAME];
+    if(!file) throw new Error('nofile');
+    const remote = JSON.parse(file.content || '{"transactions":[]}');
+    mergeRemote(remote.transactions || []);
+  }
+
+  function mergeRemote(remoteTx){
+    const map = {};
+    state.transactions.forEach(t => map[t.id] = t);
+    remoteTx.forEach(t => map[t.id] = t);
+    state.transactions = Object.values(map);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+
+  function scheduleSync(){
+    const cfg = getSyncConfig();
+    if(!cfg) return;
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(()=>{
+      pushToGist(cfg).then(()=>{
+        cfg.lastSync = Date.now(); setSyncConfig(cfg); renderSyncUI();
+      }).catch(()=> toast("Échec de la synchronisation — vérifie ta connexion"));
+    }, 1200);
+  }
+
+  function renderSyncUI(){
+    const cfg = getSyncConfig();
+    const dot = document.getElementById('sync-dot');
+    const text = document.getElementById('sync-status-text');
+    if(cfg){
+      document.getElementById('sync-setup').style.display = 'none';
+      document.getElementById('sync-connected').style.display = 'block';
+      dot.className = 'dot on';
+      text.textContent = 'Connecté sur cet appareil';
+      document.getElementById('sync-gistid-display').textContent = cfg.gistId;
+      document.getElementById('sync-last').textContent = cfg.lastSync
+        ? 'Dernière synchro : ' + new Date(cfg.lastSync).toLocaleString('fr-FR')
+        : 'Pas encore synchronisé';
+    } else {
+      document.getElementById('sync-setup').style.display = 'block';
+      document.getElementById('sync-connected').style.display = 'none';
+      dot.className = 'dot off';
+      text.textContent = 'Non connecté sur cet appareil';
+    }
+  }
+
+  document.getElementById('btn-sync-connect').addEventListener('click', async ()=>{
+    const token = document.getElementById('f-sync-token').value.trim();
+    let gistId = document.getElementById('f-sync-gistid').value.trim();
+    if(!token){ toast("Colle ton token GitHub"); return; }
+    const btn = document.getElementById('btn-sync-connect');
+    btn.disabled = true; btn.textContent = "Connexion…";
+    try{
+      if(gistId){
+        const cfg = { token, gistId };
+        await pullFromGist(cfg);
+        cfg.lastSync = Date.now();
+        setSyncConfig(cfg);
+        toast("Connecté — données récupérées");
+      } else {
+        gistId = await createGist(token);
+        setSyncConfig({ token, gistId, lastSync: Date.now() });
+        toast("Synchro créée sur cet appareil");
+      }
+      renderSyncUI(); renderDashboard(); renderTable();
+    }catch(e){
+      if(String(e.message).includes('401')) toast("Token invalide ou sans droit « gist »");
+      else if(String(e.message).includes('404')) toast("ID de synchro introuvable");
+      else toast("Impossible de se connecter — vérifie ta connexion");
+    }
+    btn.disabled = false; btn.textContent = "Connecter cet appareil";
+  });
+
+  document.getElementById('btn-sync-now').addEventListener('click', async ()=>{
+    const cfg = getSyncConfig(); if(!cfg) return;
+    toast("Synchronisation…");
+    try{
+      await pullFromGist(cfg);
+      await pushToGist(cfg);
+      cfg.lastSync = Date.now(); setSyncConfig(cfg);
+      renderSyncUI(); renderDashboard(); renderTable();
+      toast("Synchronisé");
+    }catch(e){ toast("Échec de la synchronisation"); }
+  });
+
+  document.getElementById('btn-sync-disconnect').addEventListener('click', ()=>{
+    if(confirm("Déconnecter cet appareil de la synchro ? Tes données restent sur cet appareil et sur GitHub.")){
+      clearSyncConfig(); renderSyncUI();
+      toast("Déconnecté");
+    }
+  });
+
+  document.getElementById('btn-copy-gistid').addEventListener('click', ()=>{
+    const cfg = getSyncConfig(); if(!cfg) return;
+    navigator.clipboard.writeText(cfg.gistId).then(()=> toast("ID copié")).catch(()=> toast("Copie impossible — sélectionne l'ID à la main"));
+  });
+
   /* ---------- Init ---------- */
+  (function initSync(){
+    const cfg = getSyncConfig();
+    if(cfg){
+      pullFromGist(cfg).then(()=>{ renderDashboard(); renderTable(); })
+        .catch(()=> toast("Connexion à la synchro impossible pour l'instant"));
+    }
+  })();
   renderDashboard();
   renderTable();
+  renderSyncUI();
 })();
 </script>
 </body>
