@@ -204,7 +204,6 @@
   }
   .tag.vente{ background:var(--green-soft); color:var(--green); }
   .tag.achat{ background:var(--brick-soft); color:var(--brick); }
-  .tag.frais{ background:var(--brass-soft); color:var(--brass); }
   .row-actions{ display:flex; gap:6px; }
   .icon-btn{
     border:none; background:transparent; cursor:pointer; font-size:13px; color:var(--ink-soft);
@@ -242,7 +241,6 @@
   }
   .type-toggle button.active.vente{ background:var(--green-soft); border-color:var(--green); color:var(--green); }
   .type-toggle button.active.achat{ background:var(--brick-soft); border-color:var(--brick); color:var(--brick); }
-  .type-toggle button.active.frais{ background:var(--brass-soft); border-color:var(--brass); color:var(--brass); }
   .two-col{ display:grid; grid-template-columns:1fr 1fr; gap:0 12px; }
   .modal-foot{ display:flex; justify-content:flex-end; gap:8px; margin-top:20px; }
   .net-preview{
@@ -332,7 +330,6 @@
         <div class="t-head" id="ticket-period">RÉCAPITULATIF · TOUTE PÉRIODE</div>
         <div class="t-row pos"><span class="label">Chiffre d'affaires (ventes nettes)</span><span class="val" id="t-ca">0,00 €</span></div>
         <div class="t-row neg"><span class="label">Coût des achats</span><span class="val" id="t-achats">0,00 €</span></div>
-        <div class="t-row neg"><span class="label">Frais divers</span><span class="val" id="t-frais">0,00 €</span></div>
         <div class="t-total"><span class="label">Bénéfice net</span><span class="val" id="t-total">0,00 €</span></div>
       </div>
 
@@ -352,7 +349,7 @@
     <!-- TRANSACTIONS -->
     <section class="view" id="view-transactions">
       <h1>Transactions</h1>
-      <p class="lede">Ventes, achats et frais — tout ce qui fait bouger la caisse.</p>
+      <p class="lede">Ventes et achats — tout ce qui fait bouger la caisse.</p>
 
       <div class="toolbar">
         <button class="btn teal" id="btn-add">+ Ajouter une transaction</button>
@@ -360,7 +357,6 @@
           <option value="">Tous les types</option>
           <option value="vente">Ventes</option>
           <option value="achat">Achats</option>
-          <option value="frais">Frais</option>
         </select>
         <input type="text" id="filter-search" placeholder="Rechercher un article…">
         <div class="spacer"></div>
@@ -413,7 +409,7 @@
         <h2>Format du fichier</h2>
         <p style="font-size:13px; color:var(--ink-soft); line-height:1.6;">
           Colonnes utilisées : <code>Date, Type, Article, MontantBrut, FraisVinted, FraisPort, MontantNet, Notes</code>.<br>
-          <strong>Type</strong> accepte : vente, achat, frais. Si <strong>MontantNet</strong> est vide, il est recalculé automatiquement à l'import.
+          <strong>Type</strong> accepte : vente, achat. Si <strong>MontantNet</strong> est vide, il est recalculé automatiquement à l'import.
         </p>
       </div>
     </section>
@@ -481,7 +477,6 @@
     <div class="type-toggle">
       <button type="button" class="type-btn vente active" data-type="vente">Vente</button>
       <button type="button" class="type-btn achat" data-type="achat">Achat</button>
-      <button type="button" class="type-btn frais" data-type="frais">Frais</button>
     </div>
 
     <div class="two-col">
@@ -502,10 +497,6 @@
         <div class="field"><label>Prix d'achat</label><input type="number" step="0.01" id="f-brut-achat" placeholder="0,00"></div>
         <div class="field"><label>Frais de port payés</label><input type="number" step="0.01" id="f-port-achat" placeholder="0,00"></div>
       </div>
-    </div>
-
-    <div id="fields-frais" style="display:none;">
-      <div class="field"><label>Montant</label><input type="number" step="0.01" id="f-montant-frais" placeholder="0,00"></div>
     </div>
 
     <div class="net-preview"><span>Montant net</span><span id="net-preview-val">0,00 €</span></div>
@@ -623,18 +614,16 @@
   /* ---------- Dashboard ---------- */
   function renderDashboard(){
     const txs = state.transactions;
-    let ca=0, achats=0, frais=0, ventesCount=0;
+    let ca=0, achats=0, ventesCount=0;
     txs.forEach(t=>{
       const net = computeNet(t);
       if(t.type==='vente'){ ca += net; ventesCount++; }
-      else if(t.type==='achat'){ achats += -net; }
-      else { frais += -net; }
+      else { achats += -net; }
     });
-    const total = ca - achats - frais;
+    const total = ca - achats;
 
     document.getElementById('t-ca').textContent = eur(ca);
     document.getElementById('t-achats').textContent = "− " + eur(achats);
-    document.getElementById('t-frais').textContent = "− " + eur(frais);
     const totalEl = document.getElementById('t-total');
     totalEl.textContent = signedEur(total);
     totalEl.className = "val " + (total>=0 ? "pos":"neg");
@@ -699,8 +688,7 @@
       const net = computeNet(t);
       let detail = '';
       if(t.type==='vente') detail = `Vendu ${eur(t.montantBrut)} · frais ${eur((Number(t.fraisVinted)||0)+(Number(t.fraisPort)||0))}`;
-      else if(t.type==='achat') detail = `Acheté ${eur(t.montantBrut)}` + (t.fraisPort? ` · port ${eur(t.fraisPort)}`:'');
-      else detail = t.notes ? '' : 'Frais divers';
+      else detail = `Acheté ${eur(t.montantBrut)}` + (t.fraisPort? ` · port ${eur(t.fraisPort)}`:'');
       if(t.notes) detail += (detail? ' · ':'') + t.notes;
 
       return `<tr data-id="${t.id}">
@@ -751,7 +739,7 @@
   function openModal(tx){
     editingId = tx ? tx.id : null;
     document.getElementById('modal-title').textContent = tx ? "Modifier la transaction" : "Nouvelle transaction";
-    currentType = tx ? tx.type : 'vente';
+    currentType = tx ? (tx.type === 'achat' ? 'achat' : 'vente') : 'vente';
     setType(currentType);
 
     document.getElementById('f-date').value = tx ? tx.date : new Date().toISOString().slice(0,10);
@@ -761,7 +749,6 @@
     document.getElementById('f-port-vente').value = tx && tx.type==='vente' ? (tx.fraisPort||'') : '';
     document.getElementById('f-brut-achat').value = tx && tx.type==='achat' ? tx.montantBrut : '';
     document.getElementById('f-port-achat').value = tx && tx.type==='achat' ? (tx.fraisPort||'') : '';
-    document.getElementById('f-montant-frais').value = tx && tx.type==='frais' ? tx.montantBrut : '';
     document.getElementById('f-notes').value = tx ? (tx.notes||'') : '';
 
     updatePreview();
@@ -775,8 +762,6 @@
     document.querySelectorAll('.type-btn').forEach(b=>b.classList.toggle('active', b.dataset.type===type));
     document.getElementById('fields-vente').style.display = type==='vente' ? 'block':'none';
     document.getElementById('fields-achat').style.display = type==='achat' ? 'block':'none';
-    document.getElementById('fields-frais').style.display = type==='frais' ? 'block':'none';
-    document.getElementById('f-article-label').textContent = type==='frais' ? 'Libellé' : 'Article';
     updatePreview();
   }
   document.querySelectorAll('.type-btn').forEach(b=> b.addEventListener('click', ()=>setType(b.dataset.type)));
@@ -789,11 +774,9 @@
       tx.montantBrut = parseFloat(document.getElementById('f-brut-vente').value)||0;
       tx.fraisVinted = parseFloat(document.getElementById('f-fraisvinted').value)||0;
       tx.fraisPort = parseFloat(document.getElementById('f-port-vente').value)||0;
-    } else if(currentType==='achat'){
+    } else {
       tx.montantBrut = parseFloat(document.getElementById('f-brut-achat').value)||0;
       tx.fraisPort = parseFloat(document.getElementById('f-port-achat').value)||0;
-    } else {
-      tx.montantBrut = parseFloat(document.getElementById('f-montant-frais').value)||0;
     }
     return tx;
   }
@@ -803,7 +786,7 @@
     el.textContent = signedEur(net);
     el.style.color = net>=0 ? 'var(--teal)' : 'var(--rust)';
   }
-  ['f-brut-vente','f-fraisvinted','f-port-vente','f-brut-achat','f-port-achat','f-montant-frais'].forEach(id=>{
+  ['f-brut-vente','f-fraisvinted','f-port-vente','f-brut-achat','f-port-achat'].forEach(id=>{
     document.getElementById(id).addEventListener('input', updatePreview);
   });
 
@@ -815,7 +798,7 @@
   document.getElementById('btn-save').addEventListener('click', ()=>{
     const tx = readForm();
     if(!tx.date){ toast("Ajoute une date"); return; }
-    if(!tx.article && currentType!=='frais'){ toast("Ajoute un nom d'article"); return; }
+    if(!tx.article){ toast("Ajoute un nom d'article"); return; }
     const idx = state.transactions.findIndex(t=>t.id===tx.id);
     if(idx>=0) state.transactions[idx] = tx; else state.transactions.push(tx);
     save(); closeModal(); renderTable(); renderDashboard();
@@ -894,8 +877,7 @@
 
   function normType(raw){
     const v = (raw||'').toLowerCase().trim();
-    if(['achat','achats','purchase','buy','a'].includes(v)) return 'achat';
-    if(['frais','fee','fees','f'].includes(v)) return 'frais';
+    if(['achat','achats','purchase','buy','a','frais','fee','fees','f'].includes(v)) return 'achat';
     return 'vente';
   }
 
@@ -926,11 +908,9 @@
         tx.fraisVinted = parseNum(get('fraisVinted'));
         tx.fraisPort = parseNum(get('fraisPort'));
         tx.montantBrut = brutRaw ? parseNum(brutRaw) : (parseNum(netRaw) + tx.fraisVinted + tx.fraisPort);
-      } else if(type === 'achat'){
+      } else {
         tx.fraisPort = parseNum(get('fraisPort'));
         tx.montantBrut = brutRaw ? parseNum(brutRaw) : Math.max(0, -parseNum(netRaw) - tx.fraisPort);
-      } else {
-        tx.montantBrut = brutRaw ? parseNum(brutRaw) : Math.max(0, -parseNum(netRaw));
       }
       if(!tx.date && !tx.article) return;
       state.transactions.push(tx);
