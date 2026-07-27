@@ -1053,7 +1053,10 @@
   }
 
   async function pullFromGist(cfg){
-    const res = await fetch(API + '/gists/' + cfg.gistId, { headers: ghHeaders(cfg.token) });
+    const res = await fetch(API + '/gists/' + cfg.gistId + '?_=' + Date.now(), {
+      headers: ghHeaders(cfg.token),
+      cache: 'no-store'
+    });
     if(!res.ok) throw new Error('pull:' + res.status);
     const data = await res.json();
     const file = data.files && data.files[GIST_FILENAME];
