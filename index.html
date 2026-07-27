@@ -519,6 +519,18 @@
   </div>
 </div>
 
+<!-- CONFIRM -->
+<div class="overlay" id="confirm-overlay">
+  <div class="modal" style="max-width:380px;">
+    <h2 id="confirm-title">Confirmer</h2>
+    <p class="sub" id="confirm-message" style="margin-bottom:24px;"></p>
+    <div class="modal-foot">
+      <button class="btn ghost" id="confirm-cancel">Annuler</button>
+      <button class="btn" id="confirm-ok" style="background:var(--brick); border-color:var(--brick);">Confirmer</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -540,6 +552,33 @@
   }
 
   function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+
+  function customConfirm(message, okLabel){
+    return new Promise(resolve=>{
+      const overlay = document.getElementById('confirm-overlay');
+      document.getElementById('confirm-message').textContent = message;
+      const okBtn = document.getElementById('confirm-ok');
+      const cancelBtn = document.getElementById('confirm-cancel');
+      okBtn.textContent = okLabel || 'Confirmer';
+      overlay.classList.add('open');
+      function cleanup(result){
+        overlay.classList.remove('open');
+        okBtn.removeEventListener('click', onOk);
+        cancelBtn.removeEventListener('click', onCancel);
+        overlay.removeEventListener('click', onOverlay);
+        document.removeEventListener('keydown', onEsc);
+        resolve(result);
+      }
+      function onOk(){ cleanup(true); }
+      function onCancel(){ cleanup(false); }
+      function onOverlay(e){ if(e.target===overlay) cleanup(false); }
+      function onEsc(e){ if(e.key==='Escape') cleanup(false); }
+      okBtn.addEventListener('click', onOk);
+      cancelBtn.addEventListener('click', onCancel);
+      overlay.addEventListener('click', onOverlay);
+      document.addEventListener('keydown', onEsc);
+    });
+  }
 
   /* ---------- Helpers ---------- */
   function eur(n){
@@ -686,9 +725,10 @@
       });
     });
     tbody.querySelectorAll('.del-btn').forEach(b=>{
-      b.addEventListener('click', e=>{
+      b.addEventListener('click', async e=>{
         const id = e.target.closest('tr').dataset.id;
-        if(confirm("Supprimer cette transaction ?")){
+        const ok = await customConfirm("Supprimer cette transaction ? Cette action est définitive.", "Supprimer");
+        if(ok){
           state.transactions = state.transactions.filter(t=>t.id!==id);
           save(); renderTable(); renderDashboard();
           toast("Transaction supprimée");
@@ -1101,8 +1141,9 @@
     }catch(e){ toast("Échec de la synchronisation"); }
   });
 
-  document.getElementById('btn-sync-disconnect').addEventListener('click', ()=>{
-    if(confirm("Déconnecter cet appareil de la synchro ? Tes données restent sur cet appareil et sur GitHub.")){
+  document.getElementById('btn-sync-disconnect').addEventListener('click', async ()=>{
+    const ok = await customConfirm("Déconnecter cet appareil de la synchro ? Tes données restent sur cet appareil et sur GitHub.", "Déconnecter");
+    if(ok){
       clearSyncConfig(); renderSyncUI();
       toast("Déconnecté");
     }
