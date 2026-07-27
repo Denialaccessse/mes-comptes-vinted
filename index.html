@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mes Comptes Vinted</title>
+<link rel="apple-touch-icon" href="icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Mes Comptes">
 <style>
   :root{
     --paper:#EFEDE3;
@@ -1080,6 +1084,20 @@
         .catch(()=> toast("Connexion à la synchro impossible pour l'instant"));
     }
   })();
+
+  let autoPullTimer = null;
+  function autoPullNow(){
+    const cfg = getSyncConfig();
+    if(!cfg) return;
+    clearTimeout(autoPullTimer);
+    autoPullTimer = setTimeout(()=>{
+      pullFromGist(cfg).then(()=>{ renderDashboard(); renderTable(); }).catch(()=>{});
+    }, 400);
+  }
+  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) autoPullNow(); });
+  window.addEventListener('focus', autoPullNow);
+  setInterval(autoPullNow, 30000);
+
   renderDashboard();
   renderTable();
   renderSyncUI();
